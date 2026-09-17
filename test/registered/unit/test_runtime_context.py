@@ -71,7 +71,7 @@ _DP = "sglang.srt.layers.dp_attention"
 # because the group does not know them; `TestTheThreeWorldWidths` pins those.
 SIZE_RANK_DELEGATIONS = [
     ("launch_world_size", f"{_PS}.get_world_size"),
-    ("world_rank", f"{_PS}.get_world_rank"),
+    ("launch_world_rank", f"{_PS}.get_world_rank"),
     ("tp_rank", f"{_PS}.get_tensor_model_parallel_rank"),
     ("dcp_rank", f"{_PS}.get_dcp_rank"),
     ("pp_rank", f"{_PS}.get_pipeline_model_parallel_rank"),
@@ -152,16 +152,13 @@ class TestParallelDelegation(_IsolatedOverrides):
         self.assertFalse(hasattr(ParallelContext, "local_attn_dp_size"))
 
 
-class TestTheThreeWorldWidths(_IsolatedOverrides):
-    """Three questions about the WORLD group, one per point on its timeline.
+class TestTheTwoWorldWidths(_IsolatedOverrides):
+    """Two questions about the WORLD group: what it was built at, and what it
+    has room for.
 
-    They agree until an elastic scale-up moves the third, which is why each is
-    asked for by name: what the group was built at, what it has room for, and
-    what is serving now.
-
-    None of the three is stored here. `effective_world_size` reads back into
-    the elastic-EP state, which can only go one way -- `elastic_ep` imports
-    this module at its top -- so the read sits inside the function.
+    Neither is stored here. How much of that room is serving after a scale-up
+    is elastic-EP state, and is asked of the manager that owns it rather than
+    mirrored onto this namespace.
     """
 
     def test_the_launch_width_is_what_the_group_was_built_at(self):
@@ -187,31 +184,8 @@ class TestTheThreeWorldWidths(_IsolatedOverrides):
         ):
             self.assertEqual(parallel.max_world_size, 8)
 
-    def test_the_effective_width_is_what_the_scale_committed(self):
-        from sglang.srt.elastic_ep.elastic_ep import ElasticEPStateManager
-
-        state = SimpleNamespace(effective_ep_size=16)
-        with (
-            patch.object(ElasticEPStateManager, "instance", return_value=state),
-            patch(
-                f"{_PS}.get_world_size",
-                side_effect=AssertionError("the launch width must not be asked"),
-            ),
-        ):
-            self.assertEqual(get_parallel().effective_world_size, 16)
-
-    def test_without_elastic_ep_the_effective_width_is_the_launch_width(self):
-        """A deployment that cannot scale is serving what it was built at."""
-        from sglang.srt.elastic_ep.elastic_ep import ElasticEPStateManager
-
-        with (
-            patch.object(ElasticEPStateManager, "instance", return_value=None),
-            patch(f"{_PS}.get_world_size", return_value=8),
-        ):
-            self.assertEqual(get_parallel().effective_world_size, 8)
-
     def test_each_width_can_be_stated_on_its_own(self):
-        """Stating one must not answer for another: they are three names."""
+        """Stating one must not answer for the other: they are two names."""
         parallel = get_parallel()
         with (
             parallel.override(launch_world_size=2, max_ep_size=None),
@@ -222,8 +196,8 @@ class TestTheThreeWorldWidths(_IsolatedOverrides):
         ):
             self.assertEqual(parallel.launch_world_size, 2)
             self.assertEqual(parallel.max_world_size, 2)
-            with parallel.override(effective_world_size=6):
-                self.assertEqual(parallel.effective_world_size, 6)
+            with parallel.override(max_ep_size=6):
+                self.assertEqual(parallel.max_world_size, 6)
                 self.assertEqual(parallel.launch_world_size, 2)
 
 
