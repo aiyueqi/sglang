@@ -163,7 +163,7 @@ class TestStampedRanks(_IsolatedOverrides):
     def setUp(self):
         super().setUp()
         parallel = get_parallel()
-        self._saved_derived = dict(parallel._derived)
+        self._saved_derived = dict(parallel._stamp)
         parallel.clear_derived_widths()
         self.addCleanup(
             lambda: (
@@ -1540,7 +1540,7 @@ class TestDerivedWidths(_IsolatedOverrides):
     def setUp(self):
         super().setUp()
         parallel = get_parallel()
-        self._saved_derived = dict(parallel._derived)
+        self._saved_derived = dict(parallel._stamp)
         parallel.clear_derived_widths()
         self.addCleanup(
             lambda: (
@@ -1697,7 +1697,7 @@ class TestDerivedWidths(_IsolatedOverrides):
     def test_reset_context_drops_the_permanent_override(self):
         """The permanent override belongs to the lifecycle that made it.
 
-        `_derived_width` prefers it over the published leaf, so one that
+        `_read` prefers it over the published leaf, so one that
         outlived `reset_context()` would let the next test read the previous
         topology.
         """
