@@ -326,6 +326,38 @@ class TestPrivateAttributeProbing(_IsolatedOverrides):
         self.assertIsInstance(copy.copy(get_parallel()), ParallelContext)
 
 
+class TestAWidthReadStaysTraceable(_IsolatedOverrides):
+    """A width read inside compiled model code must be an attribute load.
+
+    The widths are properties rather than names left to `__getattr__` for
+    exactly this reason: shared layers read them inside a compiled forward,
+    where an attribute load is traceable and a dynamic lookup makes dynamo
+    break the graph. A break is a performance regression and nothing else --
+    every suite stays green through it -- so `fullgraph=True` is what turns it
+    into a failure.
+    """
+
+    def test_a_width_read_compiles_into_the_graph(self):
+        import torch
+
+        reset_context()
+        self.addCleanup(reset_context)
+        publish(
+            ServerArgs(
+                model_path="dummy", tp_size=8, dp_size=2, enable_dp_attention=True
+            ),
+            role="test",
+        )
+
+        def read(x):
+            return x * get_parallel().attn_tp_size
+
+        # backend="eager": this pins tracing, not code generation, and stays
+        # runnable on a box with no inductor toolchain.
+        compiled = torch.compile(read, fullgraph=True, backend="eager")
+        self.assertEqual(compiled(torch.ones(3)).tolist(), [4.0, 4.0, 4.0])
+
+
 class TestParallelOverride(_IsolatedOverrides):
     def test_override_takes_precedence(self):
         p = get_parallel()
