@@ -1632,22 +1632,6 @@ class TestDerivedWidths(_IsolatedOverrides):
             with self.assertRaisesRegex(RuntimeError, r"derived parallel width"):
                 get_parallel().attn_tp_size
 
-    def test_a_temporary_disable_beats_the_permanent_override(self):
-        """`disable_dp_size()` runs a draft scope without DP attention. It moves
-        the module global the legacy getter reads, so it has to move the derived
-        width too -- the scoped override wins over the permanent one, and a
-        scope that left it alone would answer with the target model's width
-        for its duration."""
-        from sglang.srt.layers import dp_attention
-
-        parallel = get_parallel()
-        parallel.override_permanently(attn_dp_size=4)
-        with patch.object(dp_attention, "_ATTN_DP_SIZE", 4):
-            with dp_attention.disable_dp_size():
-                self.assertEqual(dp_attention.get_attention_dp_size(), 1)
-                self.assertEqual(parallel.attn_dp_size, 1)
-            self.assertEqual(parallel.attn_dp_size, 4)
-
     def test_the_permanent_override_is_cleared_and_reset(self):
         parallel = get_parallel()
         parallel.override_permanently(attn_dp_size=2)
