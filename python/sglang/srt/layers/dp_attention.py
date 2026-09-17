@@ -27,6 +27,7 @@ from sglang.srt.distributed.device_communicators.pynccl_allocator import (
 )
 from sglang.srt.environ import envs
 from sglang.srt.runtime_context import (
+    derive_attention_ranks,
     derive_attention_widths,
     get_device,
     get_exec,
@@ -349,15 +350,12 @@ def compute_dp_attention_world_info(
         dp_size=dp_size,
         enable_dp_attention=enable_dp_attention,
     )
-    attn_tp_rank = tp_rank % attn_tp_size
-
-    if not enable_dp_attention:
-        attn_dp_rank = 0
-    else:
-        # Rank layout is (dp, cp, tp) where tp is the fastest-changing dim:
-        # tp_rank = (attn_dp_rank * attn_cp_size + attn_cp_rank) * attn_tp_size + attn_tp_rank
-        attn_dp_rank = tp_rank // (attn_tp_size * attn_cp_size)
-
+    attn_tp_rank, attn_dp_rank = derive_attention_ranks(
+        tp_rank=tp_rank,
+        attn_tp_size=attn_tp_size,
+        attn_cp_size=attn_cp_size,
+        enable_dp_attention=enable_dp_attention,
+    )
     return attn_tp_rank, attn_tp_size, attn_dp_rank, attn_dp_size
 
 
@@ -391,6 +389,20 @@ def initialize_dp_attention(
         # itself publishes first, at `daemon.py:284`, before `:320`.)
         if ep_scale_joiner_of(resolving_view(server_args)):
             dp.joiner_skip_all_gather = True
+
+    # If `publish` already placed this process from the configuration, the
+    # groups that were built since must agree with it. They can disagree only
+    # when the published record does not describe the groups a caller went on
+    # to build -- which is a bug in that caller, and silently answering with
+    # one of the two would hide it.
+    stamped = get_parallel()._stamp.get("attn_dp_rank")
+    if stamped is not None and stamped != attn_dp_rank:
+        raise RuntimeError(
+            "attention-DP rank disagrees with the published configuration: "
+            f"publish placed this process at {stamped}, the groups built since "
+            f"put it at {attn_dp_rank}. The record that was published does not "
+            "describe the groups this process built."
+        )
 
     # Stamped together, after the elastic adjustment: the width and the rank
     # describe one topology, and a reader that caught them mid-update would
