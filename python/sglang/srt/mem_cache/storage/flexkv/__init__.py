@@ -35,6 +35,7 @@ def _flexkv_factory(ctx):
     from sglang.srt.mem_cache.storage.flexkv.flexkv_radix_cache import (
         FlexKVRadixCache,
     )
+    from sglang.srt.runtime_context import get_parallel
 
     server_args = ctx.server_args
 
@@ -42,15 +43,15 @@ def _flexkv_factory(ctx):
     # the regular TP group when attn DP is off — that's fine, the
     # connector treats size-1 groups as no-ops.
     try:
-        pp_group = get_pp_group()
+        pp_group = get_parallel().pp_group
     except (RuntimeError, AssertionError):
         pp_group = None
     try:
-        attn_tp_group = get_attn_tp_group()
+        attn_tp_group = get_parallel().attn_tp_group
     except (RuntimeError, AssertionError):
         attn_tp_group = ctx.tp_group
     try:
-        attn_cp_group = get_attn_cp_group()
+        attn_cp_group = get_parallel().attn_cp_group
     except (RuntimeError, AssertionError):
         attn_cp_group = None
 
