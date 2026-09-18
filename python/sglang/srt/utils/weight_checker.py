@@ -161,6 +161,7 @@ class WeightChecker:
         return info.model_dump()
 
     def _parallelism_info(self) -> ParallelismInfo:
+        # A check is served from the scheduler loop, outside any draft scope.
         ps = self._ps
         return ParallelismInfo(
             tp_rank=ps.tp_rank,

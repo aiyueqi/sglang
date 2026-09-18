@@ -507,8 +507,8 @@ class IpcModelLoader(BaseModelLoader):
             tp_size = ps.tp_size
             tp_rank = ps.tp_rank
 
-            pp_size = ps.pp_size
-            pp_rank = ps.pp_rank
+            pp_size = get_parallel().pp_size
+            pp_rank = get_parallel().pp_rank
 
             ep_size = ps.moe_ep_size
             moe_dp_size = get_moe_cp_size()

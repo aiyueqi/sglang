@@ -216,6 +216,8 @@ class DefaultPoolConfigurator(MemoryPoolConfigurator):
             num_layers = kvc.layer_info.num_effective_layers
 
         self._cell_size = self._compute_cell_size(kvc, num_layers)
+        # A configurator is built while the scheduler allocates the pools,
+        # outside any draft scope.
         has_kv_on_another_pp_stage = (
             self._cell_size == 0
             and mambaish is not None

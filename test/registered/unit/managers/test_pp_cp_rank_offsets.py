@@ -180,6 +180,7 @@ class TestRequestReceiverBroadcast(unittest.TestCase):
 class TestPPCPRankOffsets(unittest.TestCase):
     def test_request_receiver_uses_cp_size_for_pp_recv_rank(self):
         ps = _make_ps()
+        enter_scope(self, _published_topology())
         calls = []
 
         def fake_point_to_point_pyobj(data, rank, group, src, dst, **kwargs):
