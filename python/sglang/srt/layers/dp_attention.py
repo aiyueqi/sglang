@@ -395,7 +395,7 @@ def initialize_dp_attention(
     # when the published record does not describe the groups a caller went on
     # to build -- which is a bug in that caller, and silently answering with
     # one of the two would hide it.
-    stamped = get_parallel()._stamp.get("attn_dp_rank")
+    stamped = get_parallel().recorded("attn_dp_rank")
     if stamped is not None and stamped != attn_dp_rank:
         raise RuntimeError(
             "attention-DP rank disagrees with the published configuration: "

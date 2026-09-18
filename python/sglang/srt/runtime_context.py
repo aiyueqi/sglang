@@ -488,6 +488,16 @@ class ParallelContext:
         """
         self._stamp.update(values)
 
+    def recorded(self, name: str):
+        """What `override_permanently` recorded for `name`, or None.
+
+        Not a read of `name`: the read chain also answers from a scope and
+        from the published configuration, and a caller asking this wants the
+        record itself -- whether this process was *told* where it is, as
+        opposed to being able to work it out from a group.
+        """
+        return self._stamp.get(name)
+
     def clear_derived_widths(self) -> None:
         self._stamp.clear()
 
@@ -1702,7 +1712,17 @@ def publish(
     if ranks is not None:
         # `dp_rank` is a parallel name with no group to answer it; `gpu_id` is
         # a device fact rather than a topology one, so it lands on that bag.
-        _CONTEXT.parallel.override_permanently(dp_rank=ranks.dp_rank)
+        # Every rank the spawn knows, recorded now so a read does not need a
+        # process group. The scoped overrides that swap a group for a draft
+        # worker sit above these in the read chain, so a scope still wins.
+        _CONTEXT.parallel.override_permanently(
+            dp_rank=ranks.dp_rank,
+            tp_rank=ranks.tp_rank,
+            pp_rank=ranks.pp_rank,
+            attn_cp_rank=ranks.attn_cp_rank,
+            moe_dp_rank=ranks.moe_dp_rank,
+            moe_ep_rank=ranks.moe_ep_rank,
+        )
         _stamp_attention_ranks(_CONTEXT.parallel, ranks.tp_rank)
         device_bag = (
             _CONTEXT._config_bags.get("device") if _CONTEXT._config_bags else None
